@@ -38,3 +38,37 @@ En las prueba se puede observar que cuando las monedas se colocan desde el comie
 
 ![Demostración1](video-1-P3.gif)
 ![Demostración2](video-2-P3.gif)
+
+## Tarea 2: Clasificación de microplásticos
+
+### Preprocesamiento y Segmentación
+El objetivo de esta segunda tarea consiste en detectar, extraer y clasificar partículas presentes en imágenes de tres categorías: fragmentos plásticos (FRA), pellets (PEL) y alquitrán (TAR). En primer lugar, se define una función de extracción que procesa cada imagen. Dado que la iluminación de las cámaras o escáneres suele presentar viñeteo o gradientes indeseados, se genera una estimación del fondo de la imagen aplicando un filtro de mediana muy severo mediante `cv2.medianBlur(img, 51)`. Se realiza el mismo proceso convirtiendo la imagen mediante `cv2.cvtColor`, el cual separa la información de luminosidad de la de cromatismo.
+
+Para aislar las partículas, se calcula un mapa de contraste diferencial absoluto (`cv2.absdiff`) tanto en BGR como en LAB entre la imagen original y su fondo estimado. Se combinan estos resultados dando mayor peso a los canales de color diferencial ('a' y 'b') para destacar objetos que, aunque oscuros, tienen una fuerte firma cromática. Tras aplicar un suavizado gaussiano a este mapa de puntuación, se binariza mediante `cv2.threshold` y se limpia el ruido con una apertura morfológica usando `cv2.morphologyEx`.
+
+A continuación, se extraen los contornos externos con `cv2.findContours`. Sin embargo, es frecuente que múltiples partículas aparezcan unidas o rodeadas de sombras fuertes. Para resolver esto, se implementa una etapa de separación adaptativa: si un contorno detectado excede ciertas dimensiones o presenta una solidez geométrica baja (`área / área_convex_hull < 0.88`), se aísla su región de interés (ROI) y se recalcula un umbral dinámico local estricto basado en el valor máximo de contraste de esa zona. Esto permite separar de forma efectiva trozos de alquitrán o pellets que se tocaban físicamente.
+
+### Extracción de Características (SMACC y Color)
+Una vez localizados los contornos limpios de cada partícula, se procede a la extracción de descriptores para alimentar al modelo de aprendizaje automático, basándose en la literatura de referencia (SMACC). Mediante funciones como `cv2.contourArea`, `cv2.arcLength`, `cv2.convexHull` y `cv2.minEnclosingCircle`, se calculan propiedades puramente geométricas invariantes a la escala y rotación:
+- **Compacidad y Circularidad**: Relaciones matemáticas entre el área y el perímetro que ayudan a distinguir la redondez perfecta de un pellet frente a los bordes irregulares de un fragmento.
+- **Solidez y Extensión**: Proporción del área de la partícula frente a su envolvente convexa y su caja delimitadora (bounding box).
+- **Relaciones axiales**: Ajuste de una elipse mediante `cv2.fitEllipse` para calcular el ratio entre su eje mayor y menor.
+- **Varianza radial**: Utilizando los momentos espaciales (`cv2.moments`) para hallar el centroide, se calcula la desviación estándar y el ratio min/max de las distancias desde el centro a los bordes.
+
+Adicionalmente, se incorporan descriptores de apariencia y color. Para evitar que los píxeles del borde contaminen la muestra, se genera una máscara binaria de la partícula y se erosiona mediante `cv2.erode`. Sobre esa región interna segura, se extrae la diferencia media de luminosidad y los valores medios de los canales de color puro ('a' y 'b') en el espacio LAB.
+
+### Entrenamiento del Clasificador
+Para la fase de entrenamiento, se cargan mediante `glob` todas las imágenes proporcionadas de fragmentos, pellets y alquitrán (excluyendo la de test). Se procesan por la función de extracción, conformando un conjunto de datos tabular en `pandas`. 
+
+Se emplea un clasificador de bosque de árboles extremadamente aleatorios (`ExtraTreesClassifier` de Scikit-Learn) con 300 estimadores. Se configura con el parámetro `class_weight='balanced'` para compensar posibles diferencias en el número de muestras extraídas de cada categoría durante el ajuste con `modelo.fit()`.
+
+### Predicción y Resultados en Imagen de Test
+Para validar el sistema, se extraen los descriptores de las partículas presentes en la imagen no vista `MPs_test.jpg` y se predicen sus etiquetas. Para poder comparar objetivamente las predicciones con la realidad (Ground Truth), se cruzan los resultados con las anotaciones manuales proporcionadas en el archivo `MPs_test_bbs.csv`.
+
+El algoritmo de emparejamiento entre predicciones y anotaciones se realiza en dos fases:
+1. **Solapamiento**: Se calcula la Intersección sobre Unión entre las coordenadas de la caja detectada por visión artificial y la caja anotada en el CSV. Si el solapamiento es sustancial, se asignan como la misma partícula.
+2. **Distancia Euclidiana**: Debido a que los recuadros humanos en el CSV a veces no encajan perfectamente o están desplazados, si el IoU falla, se emplea `np.hypot` para encontrar la partícula detectada cuyo centroide esté físicamente más cerca del centroide anotado en el CSV.
+
+Finalmente, mediante `sklearn.metrics`, se evalúa el rendimiento del sistema calculando el *Accuracy* (Exactitud) global y la *Precision* ponderada, generando un reporte de clasificación por clases. Para visualizar el desempeño y detectar dónde se confunde el modelo, se representa una Matriz de Confusión utilizando un mapa de calor (`sns.heatmap`), demostrando la robustez de las características geométricas y de color seleccionadas.
+
+![alt text](image-1.png)
