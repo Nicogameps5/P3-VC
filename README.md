@@ -34,7 +34,13 @@ Al igual que en la imagen estática, la calibración métrica se realiza haciend
 
 Para preparar la demostración, se preparó cuidadosamente el entorno de captura para minimizar sombras y exceso de luz ambiente. Las monedas se colocaron sobre un folio blanco, la cámara se fijó en una posición cenital específica y se dispuso iluminación auxiliar lateral con linternas para eliminar por completo las sombras proyectadas.
 
-En las prueba se puede observar que cuando las monedas se colocan desde el comienzo y separadas a una distancia parecida, el sistema las detecta y clasifica de forma correcta y estable. En cambio, cuando se añade cada moneda una a una se puede confundir con alguna moneda aunque acertando la mayoría.
+En las prueba se puede observar que cuando las monedas se colocan desde el comienzo y separadas a una distancia parecida, el sistema las detecta y clasifica norlmalmente de forma correcta y estable. En cambio, cuando se añade cada moneda una a una se puede confundir con alguna moneda aunque acertando la mayoría.
 
 ![Demostración1](video-1-P3.gif)
 ![Demostración2](video-2-P3.gif)
+
+Además, los objetos que no son monedas, como el tapón de plástico, no se detectan al ser descartados automáticamente por el filtro de brillo interior (cv2.mean < 210) y la falta de contraste con el folio. Por otro lado, las monedas parcialmente superpuestas sí se detectan y clasifican. Esto ocurre porque la Transformada de Hough no necesita el contorno cerrado completo, bastándole los arcos visibles de la circunferencia para estimar el radio real dentro del margen de tolerancia de 2.2 mm
+
+![Demostración3](video-3-P3.gif)
+
+Uso de la IA: Durante la fase de desarrollo surgieron dos dificultades principales, como la detección de círculos falsos sobre áreas vacías del papel blanco y la fluctuación continua de los valores monetarios entre fotogramas. Para resolver estos problemas, se recurrió a la asistencia de una IA y recomendó implementar una comprobación de contraste interno creando una máscara temporal con `cv2.circle` y evaluando la intensidad media con `cv2.mean`, descartando de forma automática regiones que superaran un umbral de 210 de brillo. También recomendó diseñar una estructura de seguimiento por proximidad espacial euclídea (`np.hypot < 20`) combinada con una cola histórica de radios estabilizada mediante la mediana (`np.median`). Esta solución eliminó los saltos de etiquetas causados por el ruido del sensor sin comprometer la fluidez de la captura en vivo.
