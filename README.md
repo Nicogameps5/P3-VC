@@ -39,6 +39,11 @@ En las prueba se puede observar que cuando las monedas se colocan desde el comie
 ![Demostración1](video-1-P3.gif)
 ![Demostración2](video-2-P3.gif)
 
+![Demostración3](video-3-P3.gif)
+
+Uso de la IA: Durante la fase de desarrollo surgieron dos dificultades principales, como la detección de círculos falsos sobre áreas vacías del papel blanco y la fluctuación continua de los valores monetarios entre fotogramas. Para resolver estos problemas, se recurrió a la asistencia de una IA y recomendó implementar una comprobación de contraste interno creando una máscara temporal con `cv2.circle` y evaluando la intensidad media con `cv2.mean`, descartando de forma automática regiones que superaran un umbral de 210 de brillo. También recomendó diseñar una estructura de seguimiento por proximidad espacial euclídea (`np.hypot < 20`) combinada con una cola histórica de radios estabilizada mediante la mediana (`np.median`). Esta solución eliminó los saltos de etiquetas causados por el ruido del sensor sin comprometer la fluidez de la captura en vivo.
+
+
 ## Tarea 2: Clasificación de microplásticos
 
 ### Preprocesamiento y Segmentación
